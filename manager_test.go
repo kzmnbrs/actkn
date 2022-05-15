@@ -2,99 +2,76 @@ package actkn
 
 import (
 	"bytes"
+	"math/rand"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
-type td struct {
-	dat []byte
-	tok []byte
-}
+func FuzzManagerEncode(f *testing.F) {
+	m := NewManager("biWS2fEqV80PErLR6P-adQFhPhgfCM4zKS8hCpI0Pao")
+	f.Add([]byte(`{"id":1,"mode":255}`))
 
-var m = NewManager("O7DQ7yHnqaIJ4oNdS98ZDvCTah2tfb6CBO8_vID-VxY")
+	var dst = make([]byte, 0, 4096)
+	f.Fuzz(func(t *testing.T, src []byte) {
+		ctx := AcquireCtx()
+		defer ReleaseCtx(ctx)
 
-func tdOK() td {
-	return td{
-		dat: []byte("{\"name\":\"Borisick\",\"mode\":255}"),
-		tok: []byte("HQm?9D.OnP,!p3gBlduuCEb;RD/Wrr,!%J:215~@:h:BT:N)DN)X8dP602@C>b=j:);EKh[md(=LsVd"),
-	}
-}
+		dst = m.Encode(dst, src, ctx)
 
-func TestManager_DecodeReuse(t *testing.T) {
-	type tc struct {
-		name  string
-		td    td
-		valid bool
-	}
-	tcs := []tc{
-		{"ok", tdOK(), true},
-		{"sep", td{
-			dat: nil,
-			tok: []byte("~"),
-		}, false},
-		{"nil", td{dat: nil, tok: nil}, false},
-	}
+		ctx.Reset()
+		dec := m.DecodeReuse(dst, ctx)
 
-	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
-			tcx := acquireTestCtx()
-			defer releaseTestCtx(tcx)
-
-			tokCpy := make([]byte, len(tc.td.tok))
-			copy(tokCpy, tc.td.tok)
-
-			dat, valid := m.DecodeReuse(tokCpy, tcx.c)
-			assert.Equal(t, tc.valid, valid)
-			if !valid {
-				return
-			}
-
-			assert.Equal(t, tc.td.dat, dat)
-			assert.NotEqual(t, tc.td.tok, tokCpy)
-		})
-	}
+		if !bytes.Equal(src, dec) {
+			t.Fatal("data mismatch")
+		}
+	})
 }
 
 func BenchmarkManager_Encode(b *testing.B) {
-	td := tdOK()
+	m := NewManager("biWS2fEqV80PErLR6P-adQFhPhgfCM4zKS8hCpI0Pao")
+	src := make([]byte, 1024)
+	rand.Read(src)
 	b.ResetTimer()
 
+	b.SetParallelism(16)
 	b.RunParallel(func(pb *testing.PB) {
-		var tok []byte
+		dst := make([]byte, 0, 2048)
+		ctx := AcquireCtx()
 		for pb.Next() {
-			tcx := acquireTestCtx()
-			tok = m.Encode(tcx.dst, td.dat, tcx.c)
-			if !bytes.Equal(tok, td.tok) {
-				b.FailNow()
-			}
-			releaseTestCtx(tcx)
+			dst = m.Encode(dst, src, ctx)
+
+			ctx.Reset()
+			dst = dst[:0]
 		}
-		_ = tok
+		ReleaseCtx(ctx)
 	})
+
 	b.ReportAllocs()
 }
 
 func BenchmarkManager_DecodeReuse(b *testing.B) {
-	td := tdOK()
+	m := NewManager("biWS2fEqV80PErLR6P-adQFhPhgfCM4zKS8hCpI0Pao")
+	src := make([]byte, 1024)
+	rand.Read(src)
 	b.ResetTimer()
 
+	b.SetParallelism(16)
 	b.RunParallel(func(pb *testing.PB) {
-		var (
-			dat []byte
-			ok  bool
-		)
+		dst := make([]byte, 0, 2048)
+		ctx := AcquireCtx()
 		for pb.Next() {
-			tcx := acquireTestCtx()
-			tcx.dst = append(tcx.dst, td.tok...)
-			dat, ok = m.DecodeReuse(tcx.dst, tcx.c)
-			if !bytes.Equal(dat, td.dat) || !ok {
+			dst = m.Encode(dst, src, ctx)
+
+			ctx.Reset()
+			dst = m.DecodeReuse(dst, ctx)
+			if !bytes.Equal(dst, src) {
 				b.FailNow()
 			}
-			releaseTestCtx(tcx)
+
+			ctx.Reset()
+			dst = dst[:0]
 		}
-		_ = dat
-		_ = ok
+		ReleaseCtx(ctx)
 	})
+
 	b.ReportAllocs()
 }

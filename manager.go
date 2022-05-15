@@ -2,7 +2,7 @@ package actkn
 
 import (
 	"bytes"
-	"encoding/ascii85"
+	"encoding/base64"
 	"reflect"
 	"unsafe"
 )
@@ -11,82 +11,82 @@ type Manager struct {
 	secret []byte
 }
 
+const nEncSig = 44 // base64.URLEncoding.EncodedLen(sha256.Size)
+
+var b64 = base64.URLEncoding
+
 func NewManager(secret string) *Manager {
 	return &Manager{secret: []byte(secret)}
 }
 
-// Encode encodes ascii85(dat) + '~' + ascii85(sha256(dat + secret)) in the dst slice.
-//
-// It's safe to release Ctx after this function returns.
-func (m *Manager) Encode(dst, dat []byte, c *Ctx) []byte {
-	const nMaxSepPlusSig = 45 // ascii85.MaxEncodedLen(len("~") + sha256.Sum256(...))
-
-	// Calculating how many bytes at max is required to fit the entire token.
-	nMax := ascii85.MaxEncodedLen(len(dat))
-	if cap(dst) < nMax+nMaxSepPlusSig {
-		dst = make([]byte, nMax, nMax+nMaxSepPlusSig)
+func (m *Manager) Encode(dst, src []byte, c *Ctx) []byte {
+	if len(src) == 0 {
+		return dst
 	}
 
-	// Encoding each token part. Size calibration on each step is required
-	// since ascii85 encodes zeros with a single byte.
-	dst = unsafeSetLen(dst, nMax)
-	nDat := ascii85.Encode(dst, dat)
-	dst = unsafeSetLen(dst, nDat)
+	nEncSrc := b64.EncodedLen(len(src))
+	nEncMax := nEncSrc + 1 + nEncSig
 
-	dst = append(dst, '~')
-	dst = unsafeSetLen(dst, nDat+nMaxSepPlusSig)
+	if cap(dst) < nEncMax {
+		dst = make([]byte, 0, nEncMax)
+	}
+	dst = dst[:nEncSrc]
+	b64.Encode(dst, src)
+
+	dst = unsafeGrow(dst, nEncMax)
+	dst[nEncSrc] = '.'
+
+	c.hash.Write(src)
+	c.hash.Write(m.secret)
+	sig := c.hash.Sum(c.sig[:0])
+	b64.Encode(dst[nEncSrc+1:], sig)
+	return dst
+}
+
+func (m *Manager) DecodeReuse(src []byte, c *Ctx) []byte {
+	// b64.EncodedLen(1) + '.' + nEncSig
+	if len(src) < 4+1+nEncSig {
+		return nil
+	}
+
+	dotIdx := bytes.IndexByte(src, '.')
+	if dotIdx == -1 {
+		return nil
+	}
+
+	sig := src[dotIdx+1:]
+	if len(sig) != nEncSig {
+		return nil
+	}
+	nDecSig, err := b64.Decode(sig, sig)
+	if err != nil {
+		return nil
+	}
+	sig = sig[:nDecSig]
+
+	dat := src[:dotIdx]
+	nDecDat, err := b64.Decode(dat, dat)
+	if err != nil {
+		return nil
+	}
+	dat = dat[:nDecDat]
 
 	c.hash.Write(dat)
 	c.hash.Write(m.secret)
+	refSig := c.hash.Sum(c.sig[:0])
 
-	c.refSig = c.hash.Sum(c.refSig)
-	nSig := ascii85.Encode(dst[nDat+1:], c.refSig)
-	return unsafeSetLen(dst, nDat+1+nSig)
+	if !bytes.Equal(sig, refSig) {
+		return nil
+	}
+
+	return dat
 }
 
-// DecodeReuse verifies the given token against the singing secret
-// and decodes its contents to the tok.Data array.
-//
-// It's safe to release Ctx after this function returns.
-func (m *Manager) DecodeReuse(tok []byte, c *Ctx) ([]byte, bool) {
-	const nMaxSig = 40 // ascii85.MaxEncodedLen(sha256.Sum256(...))
-
-	sep := bytes.IndexByte(tok, '~')
-	if sep == -1 || sep == len(tok)-1 {
-		return nil, false
-	}
-
-	a85dat := tok[:sep]
-	a85sig := tok[sep+1:]
-
-	if len(a85sig) > nMaxSig {
-		return nil, false
-	}
-
-	var (
-		dat, sig []byte
-		ok       bool
-	)
-	if dat, ok = decodeA85(tok[:sep], a85dat); !ok {
-		return nil, false
-	}
-	if sig, ok = decodeA85(tok[sep+1:], a85sig); !ok {
-		return nil, false
-	}
-
-	c.hash.Write(dat)
-	c.hash.Write(m.secret)
-	c.refSig = c.hash.Sum(c.refSig)
-	return dat, bytes.Equal(sig, c.refSig)
-}
-
-func decodeA85(dst, dat []byte) ([]byte, bool) {
-	n, _, err := ascii85.Decode(dst, dat, true)
-	return dst[:n], err == nil
-}
-
-func unsafeSetLen(b []byte, newLen int) []byte {
-	sh := *(*reflect.SliceHeader)(unsafe.Pointer(&b))
-	sh.Len = newLen
-	return *(*[]byte)(unsafe.Pointer(&sh))
+func unsafeGrow(bs []byte, n int) []byte {
+	sh := *(*reflect.SliceHeader)(unsafe.Pointer(&bs))
+	return *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
+		Data: sh.Data,
+		Len:  n,
+		Cap:  sh.Cap,
+	}))
 }
