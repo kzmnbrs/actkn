@@ -33,7 +33,7 @@ func (m *Manager) Encode(dst, src []byte, c *Ctx) []byte {
 	dst = dst[:nEncSrc]
 	b64.Encode(dst, src)
 
-	dst = unsafeGrow(dst, nEncMax)
+	dst = unsafeSetLen(dst, nEncMax)
 	dst[nEncSrc] = '.'
 
 	c.hash.Write(src)
@@ -82,7 +82,7 @@ func (m *Manager) DecodeReuse(src []byte, c *Ctx) []byte {
 	return dat
 }
 
-func unsafeGrow(bs []byte, n int) []byte {
+func unsafeSetLen(bs []byte, n int) []byte {
 	sh := *(*reflect.SliceHeader)(unsafe.Pointer(&bs))
 	return *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
 		Data: sh.Data,
