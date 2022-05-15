@@ -21,7 +21,7 @@ func FuzzManagerEncode(f *testing.F) {
 		dec := m.DecodeReuse(dst, ctx)
 
 		if !bytes.Equal(src, dec) {
-			t.Fatal("data mismatch")
+			t.Fatalf("data mismatch: want `%s`, have `%s`", src, dec)
 		}
 	})
 }
