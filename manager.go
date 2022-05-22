@@ -30,7 +30,8 @@ func (m *Manager) Encode(dst, src []byte, c *Ctx) []byte {
 	if cap(dst) < nEncMax {
 		dst = make([]byte, 0, nEncMax)
 	}
-	dst = dst[:nEncSrc]
+
+	dst = unsafeSetLen(dst, nEncSrc)
 	b64.Encode(dst, src)
 
 	dst = unsafeSetLen(dst, nEncMax)
