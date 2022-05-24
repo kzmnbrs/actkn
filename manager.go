@@ -39,7 +39,7 @@ func (m *Manager) Encode(dst, src []byte, c *Ctx) []byte {
 
 	c.Hash.Write(src)
 	c.Hash.Write(m.secret)
-	sig := c.Hash.Sum(c.Buf)
+	sig := c.Hash.Sum(c.Buf[:0])
 	b64.Encode(dst[nEncSrc+1:], sig)
 	return dst
 }
@@ -74,7 +74,7 @@ func (m *Manager) DecodeReuse(src []byte, c *Ctx) []byte {
 
 	c.Hash.Write(dat)
 	c.Hash.Write(m.secret)
-	refSig := c.Hash.Sum(c.Buf)
+	refSig := c.Hash.Sum(c.Buf[:0])
 
 	if !bytes.Equal(sig, refSig) {
 		return nil
