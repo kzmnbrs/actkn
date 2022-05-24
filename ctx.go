@@ -7,16 +7,16 @@ import (
 )
 
 type Ctx struct {
-	sig  [32]byte
-	hash hash.Hash
+	Buf  []byte
+	Hash hash.Hash
 }
 
 var ctxPool = sync.Pool{}
 
 func NewCtx() *Ctx {
 	return &Ctx{
-		sig:  [32]byte{},
-		hash: sha256.New(),
+		Buf:  make([]byte, 0, 32),
+		Hash: sha256.New(),
 	}
 }
 
@@ -34,5 +34,6 @@ func ReleaseCtx(c *Ctx) {
 }
 
 func (c *Ctx) Reset() {
-	c.hash.Reset()
+	c.Buf = c.Buf[:0]
+	c.Hash.Reset()
 }

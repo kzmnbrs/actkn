@@ -37,9 +37,9 @@ func (m *Manager) Encode(dst, src []byte, c *Ctx) []byte {
 	dst = unsafeSetLen(dst, nEncMax)
 	dst[nEncSrc] = '.'
 
-	c.hash.Write(src)
-	c.hash.Write(m.secret)
-	sig := c.hash.Sum(c.sig[:0])
+	c.Hash.Write(src)
+	c.Hash.Write(m.secret)
+	sig := c.Hash.Sum(c.Buf)
 	b64.Encode(dst[nEncSrc+1:], sig)
 	return dst
 }
@@ -72,9 +72,9 @@ func (m *Manager) DecodeReuse(src []byte, c *Ctx) []byte {
 	}
 	dat = dat[:nDecDat]
 
-	c.hash.Write(dat)
-	c.hash.Write(m.secret)
-	refSig := c.hash.Sum(c.sig[:0])
+	c.Hash.Write(dat)
+	c.Hash.Write(m.secret)
+	refSig := c.Hash.Sum(c.Buf)
 
 	if !bytes.Equal(sig, refSig) {
 		return nil
