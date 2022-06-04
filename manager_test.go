@@ -18,7 +18,7 @@ func FuzzManagerEncode(f *testing.F) {
 		dst = m.Encode(dst, src, ctx)
 
 		ctx.Reset()
-		dec := m.DecodeReuse(dst, ctx)
+		dec := m.Decode(dst, ctx)
 
 		if !bytes.Equal(src, dec) {
 			t.Fatalf("data mismatch: want `%s`, have `%s`", src, dec)
@@ -62,7 +62,7 @@ func BenchmarkManager_DecodeReuse(b *testing.B) {
 			dst = m.Encode(dst, src, ctx)
 
 			ctx.Reset()
-			dst = m.DecodeReuse(dst, ctx)
+			dst = m.Decode(dst, ctx)
 			if !bytes.Equal(dst, src) {
 				b.FailNow()
 			}
