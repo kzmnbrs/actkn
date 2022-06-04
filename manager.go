@@ -7,6 +7,8 @@ import (
 	"unsafe"
 )
 
+//go:generate mockgen -source manager.go -package actkn -destination manager_mock.go
+
 type Manager struct {
 	secret []byte
 }
