@@ -9,24 +9,24 @@ import (
 
 //go:generate mockgen -source manager.go -package actkn -destination manager_mock.go
 
-type Manager struct {
-	secret []byte
-}
-
-type ManagerInterface interface {
+type Manager interface {
 	Encode(dst, src []byte, c *Ctx) []byte
 	Decode(src []byte, c *Ctx) []byte
+}
+
+type B64Manager struct {
+	secret []byte
 }
 
 const nEncSig = 44 // base64.URLEncoding.EncodedLen(sha256.Size)
 
 var b64 = base64.URLEncoding
 
-func NewManager(secret string) *Manager {
-	return &Manager{secret: []byte(secret)}
+func NewManager(secret string) *B64Manager {
+	return &B64Manager{secret: []byte(secret)}
 }
 
-func (m *Manager) Encode(dst, src []byte, c *Ctx) []byte {
+func (m *B64Manager) Encode(dst, src []byte, c *Ctx) []byte {
 	if len(src) == 0 {
 		return dst
 	}
@@ -51,7 +51,7 @@ func (m *Manager) Encode(dst, src []byte, c *Ctx) []byte {
 	return dst
 }
 
-func (m *Manager) Decode(src []byte, c *Ctx) []byte {
+func (m *B64Manager) Decode(src []byte, c *Ctx) []byte {
 	// b64.EncodedLen(1) + '.' + nEncSig
 	if len(src) < 4+1+nEncSig {
 		return nil
