@@ -22,7 +22,7 @@ const nEncSig = 44 // base64.URLEncoding.EncodedLen(sha256.Size)
 
 var b64 = base64.URLEncoding
 
-func NewManager(secret string) *B64Manager {
+func NewB64Manager(secret string) *B64Manager {
 	return &B64Manager{secret: []byte(secret)}
 }
 

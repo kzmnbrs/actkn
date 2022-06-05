@@ -7,7 +7,7 @@ import (
 )
 
 func FuzzManagerEncode(f *testing.F) {
-	m := NewManager("biWS2fEqV80PErLR6P-adQFhPhgfCM4zKS8hCpI0Pao")
+	m := NewB64Manager("biWS2fEqV80PErLR6P-adQFhPhgfCM4zKS8hCpI0Pao")
 	f.Add([]byte(`{"id":1,"mode":255}`))
 
 	var dst = make([]byte, 0, 4096)
@@ -27,7 +27,7 @@ func FuzzManagerEncode(f *testing.F) {
 }
 
 func BenchmarkManager_Encode(b *testing.B) {
-	m := NewManager("biWS2fEqV80PErLR6P-adQFhPhgfCM4zKS8hCpI0Pao")
+	m := NewB64Manager("biWS2fEqV80PErLR6P-adQFhPhgfCM4zKS8hCpI0Pao")
 	src := make([]byte, 1024)
 	rand.Read(src)
 	b.ResetTimer()
@@ -49,7 +49,7 @@ func BenchmarkManager_Encode(b *testing.B) {
 }
 
 func BenchmarkManager_DecodeReuse(b *testing.B) {
-	m := NewManager("biWS2fEqV80PErLR6P-adQFhPhgfCM4zKS8hCpI0Pao")
+	m := NewB64Manager("biWS2fEqV80PErLR6P-adQFhPhgfCM4zKS8hCpI0Pao")
 	src := make([]byte, 1024)
 	rand.Read(src)
 	b.ResetTimer()
